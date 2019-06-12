@@ -16,6 +16,8 @@
 
 package io.confluent.connect.jdbc.source;
 
+import io.confluent.connect.jdbc.dialect.DatabaseDialect;
+import io.confluent.connect.jdbc.util.TableId;
 import org.apache.kafka.connect.source.SourceRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,9 +26,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.util.TableId;
 
 /**
  * TableQuerier executes queries against a specific table. Implementations handle different types
@@ -117,8 +116,10 @@ abstract class TableQuerier implements Comparable<TableQuerier> {
     if (stmt != null) {
       try {
         stmt.close();
-      } catch (SQLException ignored) {
-        // intentionally ignored
+      } catch (SQLException ex) {
+        log.warn("Failed to close statement quietly, {}, {}",
+                ex.getClass().getName(),
+                ex.getMessage());
       }
     }
     stmt = null;
@@ -128,8 +129,10 @@ abstract class TableQuerier implements Comparable<TableQuerier> {
     if (resultSet != null) {
       try {
         resultSet.close();
-      } catch (SQLException ignored) {
-        // intentionally ignored
+      } catch (SQLException ex) {
+        log.warn("Failed to close resultSet quietly, {}, {}",
+                ex.getClass().getName(),
+                ex.getMessage());
       }
     }
     resultSet = null;

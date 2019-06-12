@@ -16,6 +16,17 @@
 
 package io.confluent.connect.jdbc;
 
+import io.confluent.connect.jdbc.dialect.DatabaseDialect;
+import io.confluent.connect.jdbc.dialect.DatabaseDialects;
+import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig;
+import io.confluent.connect.jdbc.source.JdbcSourceTask;
+import io.confluent.connect.jdbc.source.JdbcSourceTaskConfig;
+import io.confluent.connect.jdbc.source.NoOpTableMonitorThread;
+import io.confluent.connect.jdbc.source.TableMonitorThread;
+import io.confluent.connect.jdbc.util.CachedConnectionProvider;
+import io.confluent.connect.jdbc.util.ExpressionBuilder;
+import io.confluent.connect.jdbc.util.TableId;
+import io.confluent.connect.jdbc.util.Version;
 import org.apache.kafka.common.config.ConfigDef;
 import org.apache.kafka.common.config.ConfigException;
 import org.apache.kafka.connect.connector.Task;
@@ -32,17 +43,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
-import io.confluent.connect.jdbc.dialect.DatabaseDialect;
-import io.confluent.connect.jdbc.dialect.DatabaseDialects;
-import io.confluent.connect.jdbc.source.JdbcSourceConnectorConfig;
-import io.confluent.connect.jdbc.source.JdbcSourceTask;
-import io.confluent.connect.jdbc.source.JdbcSourceTaskConfig;
-import io.confluent.connect.jdbc.source.TableMonitorThread;
-import io.confluent.connect.jdbc.util.CachedConnectionProvider;
-import io.confluent.connect.jdbc.util.ExpressionBuilder;
-import io.confluent.connect.jdbc.util.TableId;
-import io.confluent.connect.jdbc.util.Version;
 
 /**
  * JdbcConnector is a Kafka Connect Connector implementation that watches a JDBC database and
@@ -118,14 +118,25 @@ public class JdbcSourceConnector extends SourceConnector {
       whitelistSet = Collections.emptySet();
 
     }
-    tableMonitorThread = new TableMonitorThread(
-        dialect,
-        cachedConnectionProvider,
-        context,
-        tablePollMs,
-        whitelistSet,
-        blacklistSet
-    );
+    if (config.getBoolean(JdbcSourceConnectorConfig.ENABLE_TABLE_MONITOR)) {
+      tableMonitorThread = new TableMonitorThread(
+              dialect,
+              cachedConnectionProvider,
+              context,
+              tablePollMs,
+              whitelistSet,
+              blacklistSet
+      );
+    } else {
+      tableMonitorThread = new NoOpTableMonitorThread(
+              dialect,
+              cachedConnectionProvider,
+              context,
+              tablePollMs,
+              whitelistSet,
+              blacklistSet
+      );
+    }
     tableMonitorThread.start();
   }
 

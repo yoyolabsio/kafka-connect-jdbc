@@ -16,7 +16,17 @@
 
 package io.confluent.connect.jdbc.dialect;
 
+import io.confluent.connect.jdbc.dialect.DatabaseDialectProvider.SubprotocolBasedProvider;
+import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
+import io.confluent.connect.jdbc.source.ColumnMapping;
 import io.confluent.connect.jdbc.source.JdbcSourceTaskConfig;
+import io.confluent.connect.jdbc.util.ColumnDefinition;
+import io.confluent.connect.jdbc.util.ColumnId;
+import io.confluent.connect.jdbc.util.ExpressionBuilder;
+import io.confluent.connect.jdbc.util.ExpressionBuilder.Transform;
+import io.confluent.connect.jdbc.util.IdentifierRules;
+import io.confluent.connect.jdbc.util.PreparedStatementProxy;
+import io.confluent.connect.jdbc.util.TableId;
 import org.apache.kafka.common.config.AbstractConfig;
 import org.apache.kafka.connect.data.Date;
 import org.apache.kafka.connect.data.Decimal;
@@ -31,16 +41,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Collection;
-
-import io.confluent.connect.jdbc.dialect.DatabaseDialectProvider.SubprotocolBasedProvider;
-import io.confluent.connect.jdbc.sink.metadata.SinkRecordField;
-import io.confluent.connect.jdbc.source.ColumnMapping;
-import io.confluent.connect.jdbc.util.ColumnDefinition;
-import io.confluent.connect.jdbc.util.ColumnId;
-import io.confluent.connect.jdbc.util.ExpressionBuilder;
-import io.confluent.connect.jdbc.util.ExpressionBuilder.Transform;
-import io.confluent.connect.jdbc.util.IdentifierRules;
-import io.confluent.connect.jdbc.util.TableId;
 
 /**
  * A {@link DatabaseDialect} for PostgreSQL.
@@ -75,9 +75,7 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
 
   @Override
   public Connection getConnection() throws SQLException {
-    Connection connection = super.getConnection();
-    connection.setAutoCommit(false);
-    return connection;
+    return super.getConnection();
   }
 
   /**
@@ -94,12 +92,22 @@ public class PostgreSqlDatabaseDialect extends GenericDatabaseDialect {
    */
   @Override
   protected void initializePreparedStatement(PreparedStatement stmt) throws SQLException {
-    int batchMaxRows = config.getInt(JdbcSourceTaskConfig.BATCH_MAX_ROWS_CONFIG);
     log.trace("Initializing PreparedStatement fetch direction to FETCH_FORWARD for '{}'", stmt);
+    stmt.getConnection().setAutoCommit(false);
     stmt.setFetchDirection(ResultSet.FETCH_FORWARD);
+
+    int batchMaxRows = config.getInt(JdbcSourceTaskConfig.BATCH_MAX_ROWS_CONFIG);
     stmt.setFetchSize(batchMaxRows);
   }
 
+  @Override
+  public PreparedStatement createPreparedStatement(Connection db, String query)
+          throws SQLException {
+    log.trace("Creating a PreparedStatement '{}'", query);
+    PreparedStatement stmt = db.prepareStatement(query);
+    this.initializePreparedStatement(stmt);
+    return PreparedStatementProxy.newInstance(stmt);
+  }
 
   @Override
   public String addFieldToSchema(
